@@ -1,0 +1,14 @@
+{
+  "status": "proposed_controller_contract_not_a_running_orchestrator",
+  "candidate_allowlist": ["Dockerfile", "composer.json", "config/security.ini"],
+  "verifier_directory": "verification",
+  "candidate_may_edit_verifier": false,
+  "candidate_may_edit_ci_or_application": false,
+  "runtime_network": "disabled_during_verification",
+  "runtime_secrets": "none",
+  "maximum_attempts": 2,
+  "maximum_seconds_per_check": 60,
+  "draft_pr_requires": ["allowlisted_diff", "static_candidate_policy_pass", "actual_runtime_probe_pass", "business_regressions_pass", "unchanged_verifier_identity", "recorded_base_and_head_commits"],
+  "merge_authority": "human_only",
+  "deployment_or_environment_follow_up": "must_be_visible_on_the_draft_pr_and_prevents_automatic_finding_closure"
+}

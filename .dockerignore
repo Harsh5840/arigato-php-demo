@@ -1,0 +1,10 @@
+.git
+.github
+.env*
+node_modules
+vendor
+artifacts
+verification
+demo
+README.md
+package*.json

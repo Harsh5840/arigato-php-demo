@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "scenario": "php-runtime-october-2026",
+  "trigger_mode": "historical_advisory_replay",
+  "inventory_kind": "synthetic_repository_fixture",
+  "source_verified_date": "2026-10-24",
+  "advisory_ids": ["CVE-2026-109618", "CVE-2026-109619"],
+  "component": { "ecosystem": "PHP runtime", "branch": "8.3", "fixture_version": "8.3.35", "fixed_version": "8.3.36" },
+  "sources": [
+    "https://www.php.net/archive/2026.php",
+    "https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w",
+    "https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp"
+  ],
+  "reviewed_candidate_image": {
+    "reference": "php:8.3.36-cli-bookworm@sha256:cdb77e306d6bb99db40e513fbe036ecc6c53b575cbcb7e581387845fef26d755",
+    "metadata_source": "https://hub.docker.com/v2/repositories/library/php/tags/8.3.36-cli-bookworm",
+    "metadata_last_updated": "2026-10-21T22:05:24.82223Z",
+    "image_execution_during_research": false
+  },
+  "follow_up": {
+    "date": "2026-10-23",
+    "pending_advisory_id": "CVE-2026-115560",
+    "action": "Review effective session-upload configuration and runtime serializer changes; apply startup mitigation and restart workers when deployed.",
+    "closure": "Human environment review remains required. A CLI check does not verify the deployed service."
+  },
+  "japan_context": {
+    "application": "Fictional Japanese SME storefront with Japanese UTF-8 catalog and integer JPY order controls.",
+    "planned_sources": ["https://jvn.jp/en/", "https://www.jpcert.or.jp/english/", "https://www.ipa.go.jp/en/"],
+    "integration_status": "not_implemented",
+    "source_availability_note": "JVN announced a temporary MyJVN/JVN iPedia service outage on 2026-10-22; production adapters need explicit degraded mode."
+  },
+  "live_agent_inference": false,
+  "exploit_executed": false
+}

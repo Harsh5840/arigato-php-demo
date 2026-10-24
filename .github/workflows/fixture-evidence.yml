@@ -1,0 +1,82 @@
+name: Fixture evidence
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+concurrency:
+  group: fixture-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  affected-baseline:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+      - run: npm test
+      - name: Classify affected inventory without executing it
+        run: |
+          npm run assess:baseline
+          echo 'Correctly classified as affected. Security policy is FAIL. No affected image was executed.' >> "$GITHUB_STEP_SUMMARY"
+  candidate-evidence:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Checkout frozen baseline verifier
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: oracle
+          persist-credentials: false
+      - name: Checkout candidate
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+      - name: Verify identities, scope and candidate policy
+        run: |
+          mkdir -p artifacts
+          node oracle/verification/ci-candidate.mjs candidate "$BASE_SHA" "$HEAD_SHA" | tee artifacts/candidate-policy.json
+      - name: Build only the fixed candidate image
+        run: |
+          docker build --pull --network none -t sakurashop-candidate candidate
+          docker image inspect sakurashop-candidate --format '{{.Id}}' | tee artifacts/built-image-id.txt
+      - name: Execute frozen PHP runtime and business checks
+        shell: bash
+        run: |
+          args=(--rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --cpus 1 --memory 128m --pids-limit 64 --mount "type=bind,source=$GITHUB_WORKSPACE/oracle/verification,target=/app/verification,readonly" --entrypoint php)
+          docker run "${args[@]}" sakurashop-candidate /app/verification/runtime-probe.php | tee artifacts/runtime-probe.json
+          docker run "${args[@]}" sakurashop-candidate /app/verification/business.php | tee artifacts/business-checks.txt
+      - name: Summarize scope and remaining review
+        if: always()
+        run: |
+          echo '### SakuraShop candidate evidence' >> "$GITHUB_STEP_SUMMARY"
+          printf 'Base: `%s`\n\nCandidate: `%s`\n\n' "$BASE_SHA" "$HEAD_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Read step outcomes and attached logs. No RCE, deployment, incident containment, Groq invocation or merge approval occurs here. Deployment/configuration review remains human-owned.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: candidate-evidence-${{ github.event.pull_request.head.sha }}
+          path: artifacts/
+          retention-days: 7

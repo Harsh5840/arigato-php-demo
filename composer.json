@@ -1,0 +1,9 @@
+{
+  "name": "arigato/sakurashop-demo",
+  "description": "Intentionally outdated PHP runtime inventory fixture; never deploy.",
+  "type": "project",
+  "license": "UNLICENSED",
+  "require": {
+    "php": ">=8.3.35 <8.4"
+  }
+}
