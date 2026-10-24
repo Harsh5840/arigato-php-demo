@@ -62,3 +62,18 @@ test('Composer cannot require a version newer than the selected interpreter', ()
   assert.equal(result.checks.find((check) => check.id === 'composer_floor').pass, false);
   assert.equal(result.security_policy, 'FAIL');
 });
+
+for (const directive of ['# syntax=attacker/frontend', '# escape=\\', '# check=skip=all', '  # SyNtAx = attacker/frontend']) {
+  test(`Docker parser directive is rejected before any candidate build: ${directive}`, () => {
+    const candidate = { ...readContents(root) };
+    candidate.Dockerfile = candidate.Dockerfile.replace('php:8.3.35-cli-bookworm', `php:${fixedVersion}-cli-bookworm@sha256:${reviewedDigest}`);
+    candidate['composer.json'] = candidate['composer.json'].replace('>=8.3.35 <8.4', `>=${fixedVersion} <8.4`);
+    candidate['config/security.ini'] = candidate['config/security.ini'].replace('session.upload_progress.enabled = 1', 'session.upload_progress.enabled = 0');
+    assert.equal(inspect(candidate).security_policy, 'PASS', 'the ordinary fixed candidate should be accepted');
+    candidate.Dockerfile = `${directive}\n${candidate.Dockerfile}`;
+    const result = inspect(candidate);
+    assert.equal(result.security_policy, 'FAIL');
+    assert.equal(result.checks.find((check) => check.id === 'docker_parser_directives_absent').pass, false);
+    assert.ok(result.checks.filter((check) => check.id !== 'docker_parser_directives_absent').every((check) => check.pass));
+  });
+}

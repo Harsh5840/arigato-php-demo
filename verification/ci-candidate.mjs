@@ -15,6 +15,9 @@ assert.deepEqual(paths, [...allowedPaths].sort(), 'Only the approved three files
 assert.equal(verifierDigest(candidate), verifierDigest(root), 'Verifier identity changed.');
 const baseline = readContents(root);
 const source = readContents(candidate);
+// Docker parser directives are executable build configuration, not inert comments.
+// In particular, syntax= can fetch an external frontend before RUN network limits apply.
+assert.equal(/^\s*#\s*(syntax|escape|check)\s*=/im.test(source.Dockerfile), false, 'Docker parser directives are outside the approved fixture scope.');
 const assessment = inspect(source);
 assert.equal(inspect(baseline).affected_version_match, true, 'Oracle must be the affected baseline.');
 assert.equal(assessment.security_policy, 'PASS', 'Candidate policy must pass.');

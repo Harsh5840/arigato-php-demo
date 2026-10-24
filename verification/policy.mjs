@@ -34,6 +34,7 @@ export function inspect(contents) {
   const uploadProgress = settings.length === 1 ? settings[0].match(/^\s*session\.upload_progress\.enabled\s*=\s*([01])\s*(?:;.*)?$/)?.[1] ?? null : null;
   const runtimeVersion = image?.[1] ?? null;
   const checks = [
+    { id: 'docker_parser_directives_absent', pass: !/^\s*#\s*(syntax|escape|check)\s*=/im.test(contents.Dockerfile), detail: 'No model-controlled build frontend, escape or check parser directives are permitted.' },
     { id: 'reviewed_runtime_release', pass: runtimeVersion === fixedVersion, detail: runtimeVersion ?? 'unrecognized runtime declaration' },
     { id: 'reviewed_image_digest', pass: image?.[2] === reviewedDigest, detail: image?.[2] ?? 'no reviewed digest pin' },
     { id: 'composer_floor', pass: floor !== null && runtimeVersion !== null && versionCompare(floor, fixedVersion) >= 0 && versionCompare(floor, runtimeVersion) <= 0, detail: constraint || 'missing PHP constraint' },
