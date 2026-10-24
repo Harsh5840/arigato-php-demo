@@ -4,6 +4,6 @@
   "type": "project",
   "license": "UNLICENSED",
   "require": {
-    "php": ">=8.3.35 <8.4"
+    "php": ">=8.3.36 <8.4"
   }
 }
