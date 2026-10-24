@@ -30,7 +30,7 @@ const directives = text => text.split(/\r?\n/).map(line => line.trim()).filter(l
 assert.deepEqual(directives(source['config/security.ini']), directives(baseline['config/security.ini']).map(line => line.replace(/^session\.upload_progress\.enabled\s*=\s*1$/, 'session.upload_progress.enabled = 0')), 'Unexpected startup setting change.');
 console.log(JSON.stringify({
   evidence_class: 'frozen_oracle_candidate_policy',
-  execution_origin: 'prepared_fixture_repair_not_live_groq',
+  execution_origin: 'candidate_source_not_attested_by_verifier',
   base_sha: baseSha, candidate_sha: headSha, changed_paths: paths,
   verifier_sha256: verifierDigest(root),
   source_snapshot: JSON.parse(readFileSync(resolve(root, 'demo/advisory.json'), 'utf8')),

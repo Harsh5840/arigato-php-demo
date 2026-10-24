@@ -1,16 +1,31 @@
 name: Fixture evidence
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('ProofPatch {0}', inputs.run_id) || format('Fixture evidence {0}', github.event_name) }}
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: Exact affected baseline commit on main
+        required: true
+        type: string
+      head_sha:
+        description: Exact candidate commit to verify
+        required: true
+        type: string
+      run_id:
+        description: ProofPatch orchestration run identifier
+        required: true
+        type: string
 permissions:
   contents: read
 defaults:
   run:
-    shell: bash
+    shell: bash --noprofile --norc -e -o pipefail {0}
 concurrency:
-  group: fixture-${{ github.ref }}
+  group: fixture-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.ref }}
   cancel-in-progress: true
 jobs:
   affected-baseline:
@@ -30,23 +45,42 @@ jobs:
           npm run assess:baseline
           echo 'Correctly classified as affected. Security policy is FAIL. No affected image was executed.' >> "$GITHUB_STEP_SUMMARY"
   candidate-evidence:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      BASE_SHA: ${{ inputs.base_sha || github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ inputs.head_sha || github.event.pull_request.head.sha }}
+      PROOFPATCH_RUN_ID: ${{ inputs.run_id }}
+      WORKFLOW_SHA: ${{ github.sha }}
+      WORKFLOW_REF: ${{ github.ref }}
+      HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
     steps:
+      - name: Validate fixed-repository identities before checkout
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          [[ "$GITHUB_REPOSITORY" == 'Harsh5840/arigato-php-demo' ]]
+          [[ "$HEAD_REPOSITORY" == "$GITHUB_REPOSITORY" ]]
+          [[ "$BASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$HEAD_SHA" =~ ^[a-f0-9]{40}$ ]]
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
+            [[ "$PROOFPATCH_RUN_ID" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$ ]]
+            [[ "$WORKFLOW_REF" == 'refs/heads/main' ]]
+            [[ "$BASE_SHA" == "$WORKFLOW_SHA" ]]
+          fi
       - name: Checkout frozen baseline verifier
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          repository: Harsh5840/arigato-php-demo
+          ref: ${{ env.BASE_SHA }}
           path: oracle
           persist-credentials: false
       - name: Checkout candidate
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          repository: Harsh5840/arigato-php-demo
+          ref: ${{ env.HEAD_SHA }}
           path: candidate
           fetch-depth: 0
           persist-credentials: false
@@ -57,12 +91,12 @@ jobs:
         run: |
           mkdir -p artifacts
           node oracle/verification/ci-candidate.mjs candidate "$BASE_SHA" "$HEAD_SHA" | tee artifacts/candidate-policy.json
+          node --input-type=module -e 'import { writeFileSync } from "node:fs"; import { verifierDigest } from "./oracle/verification/policy.mjs"; writeFileSync("artifacts/run-provenance.json", JSON.stringify({ proofpatch_run_id: process.env.PROOFPATCH_RUN_ID || null, github_run_id: process.env.GITHUB_RUN_ID, workflow_sha: process.env.WORKFLOW_SHA, base_sha: process.env.BASE_SHA, candidate_sha: process.env.HEAD_SHA, verifier_sha256: verifierDigest(), model_execution: "NOT_ATTESTED_BY_CI", merge_ready: false, finding_closed: false }, null, 2));'
       - name: Build only the fixed candidate image
         run: |
           docker build --pull --network none -t sakurashop-candidate candidate
           docker image inspect sakurashop-candidate --format '{{.Id}}' | tee artifacts/built-image-id.txt
       - name: Execute frozen PHP runtime and business checks
-        shell: bash
         run: |
           args=(--rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --cpus 1 --memory 128m --pids-limit 64 --mount "type=bind,source=$GITHUB_WORKSPACE/oracle/verification,target=/app/verification,readonly" --entrypoint php)
           docker run "${args[@]}" sakurashop-candidate /app/verification/runtime-probe.php | tee artifacts/runtime-probe.json
@@ -77,6 +111,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: candidate-evidence-${{ github.event.pull_request.head.sha }}
+          name: candidate-evidence-${{ env.HEAD_SHA }}
           path: artifacts/
           retention-days: 7
